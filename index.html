@@ -82,12 +82,13 @@
         .channel-info { flex: 1; text-align: left; direction: ltr; }
         .channel-name { font-weight: bold; font-size: 14px; }
         .channel-freq { font-size: 11px; color: var(--text-muted); }
-        .quality-badge { font-size: 11px; font-weight: bold; color: var(--primary-blue); }
+        .quality-badge { font-size: 12px; font-weight: bold; color: var(--primary-blue); }
+        .sharing-text { color: var(--green-lock); font-size: 11px; font-weight: bold; }
 
         .loading-msg { text-align: center; padding: 50px; color: var(--text-muted); font-weight: bold; }
     </style>
 </head>
-<body>
+<body class="dark-mode">
 
 <div class="app-container">
     <div id="matches-list-view">
@@ -96,7 +97,7 @@
             <span id="ui-title">مباريات اليوم</span>
             <div class="header-icons">
                 <i id="lang-toggle-btn" class="fa-solid fa-globe action-icon" onclick="toggleLanguage()"></i>
-                <i id="theme-toggle-btn" class="fa-solid fa-moon action-icon" onclick="toggleTheme()"></i>
+                <i id="theme-toggle-btn" class="fa-solid fa-sun action-icon" onclick="toggleTheme()"></i>
                 <i class="fa-solid fa-rotate-right action-icon" onclick="fetchMatches()"></i>
             </div>
         </header>
@@ -147,14 +148,54 @@
 
 <script>
     const API_KEY = '0c2ab936e7b9e517da7064f37da8ec10';
-    const TOP_LEAGUES = [2, 3, 39, 140, 135, 78, 61, 233, 307]; // شامل الدوري المصري
+    const TOP_LEAGUES = [2, 3, 39, 140, 135, 78, 61, 233, 307];
     let cachedMatches = []; 
     let isArabic = true; 
-    
-    // متغير هيشيل الداتا بتاعة القنوات من الملف الخارجي
-    let customChannelsDB = {};
 
-    // القاموس للتعريب
+    // ==========================================
+    // قاعدة بيانات القنوات (ثابتة لكل المباريات زي الصور بالظبط)
+    // ==========================================
+    const allMatchesChannels = [
+        { "name": "beIN SPORTS 1 Qatar", "freq": "Nilesat 7°W - 11013 H 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "beIN SPORTS 1 Qatar", "freq": "Badr 26°E - 10810 V 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "beIN SPORTS EN 1 Qatar", "freq": "Nilesat 7°W - 12245 V 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "beIN SPORTS EN 1 Qatar", "freq": "Badr 26°E - 10850 V 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "beIN SPORTS FR 2 Qatar", "freq": "Badr 26°E - 10850 V 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "beIN SPORTS 2 France", "freq": "Astra 19.2°E - 11856 V 29700", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "M+ #Vamos Spain", "freq": "Astra 19.2°E - 10818 V 22000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "M+ Liga de Campeones Spain", "freq": "Astra 19.2°E - 11259 V 22000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "TNT Sports 1 UK", "freq": "Astra 28.2°E - 11582 H 23000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "SuperSport Premier League Africa", "freq": "Eutelsat 36°E - 12169 H 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "Idman TV Azerbaijan", "freq": "AzerSpace 46°E - 11175 H 30000", "status": "open", "quality": "HD", "sharing": false },
+        { "name": "Varzish Tajikistan", "freq": "Yahsat 52.5°E - 11785 H 27500", "status": "open", "quality": "HD", "sharing": false },
+        { "name": "beIN SPORTS 3 Qatar", "freq": "Nilesat 7°W - 11013 H 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "beIN SPORTS 3 Qatar", "freq": "Badr 26°E - 10810 V 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "DAZN LaLiga 2 Spain", "freq": "Astra 19.2°E - 10758 V 22000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "LaLiga TV Bar Spain", "freq": "Astra 19.2°E - 10818 V 22000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "beIN SPORTS Max 4 France", "freq": "Astra 19.2°E - 11856 V 29700", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "SuperSport Laliga Africa", "freq": "Eutelsat 36°E - 12341 V 27500", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "Canal+ Sport Poland", "freq": "Hotbird 13°E - 11278 V 27500", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "DAZN 1 Portugal", "freq": "Hispasat 30°W - 12399 H 27500", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "Nova Sports 1 Greece", "freq": "Hotbird 13°E - 11804 V 30000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "Arena Sport 2 Croatia", "freq": "Eutelsat 16°E - 11554 V 30000", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "Arena 5 Premium Serbia", "freq": "Eutelsat 16°E - 11429 V 30000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "Arena Sport 1 Premium Slovenia", "freq": "Eutelsat 16°E - 11677 V 30000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "Arena Premium 3 Bosnia", "freq": "Eutelsat 16°E - 11232 V 42000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "Max Sport 4 Bulgaria", "freq": "BulgariaSat 1.9°E - 12303 H 30000", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "Nova Sport 4 Czech", "freq": "Thor 0.8°W - 11977 H 30000", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "Nova Sport 4 Czech", "freq": "Astra 23.5°E - 11937 V 29900", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "Spíler 2 Hungary", "freq": "Thor 0.8°W - 11727 V 28000", "status": "locked", "quality": "SD", "sharing": true },
+        { "name": "Digi Sport 3 Romania", "freq": "Thor 0.8°W - 12687 H 27500", "status": "locked", "quality": "SD", "sharing": true },
+        { "name": "Prima Sport 2 Romania", "freq": "HellasSat 39°E - 12290 V 30000", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "Ziggo Sport Netherlands", "freq": "Astra 23.5°E - 12129 V 29900", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "MTV Urheilu 1 Finland", "freq": "Thor 0.8°W - 12476 H 30000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "Setanta Sports 2 Eurasia", "freq": "TurkmenÄlem 52°E - 10845 H 30000", "status": "locked", "quality": "HD", "sharing": true },
+        { "name": "MATCH! Futbol 2 Russia", "freq": "Express 80°E - 11044 V 45000", "status": "locked", "quality": "SD", "sharing": true },
+        { "name": "Azam Sports 4 Tanzania", "freq": "Eutelsat 7°E - 10981 V 45000", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "ESPN 4 Brazil", "freq": "Intelsat 45°W - 3850 H 21600", "status": "locked", "quality": "HD", "sharing": false },
+        { "name": "ONE Sport", "freq": "Amos 4°W - 11250 V 30000", "status": "locked", "quality": "HD", "sharing": true }
+    ];
+
     const dictionary = {
         "UEFA Champions League": "دوري أبطال أوروبا",
         "UEFA Europa League": "الدوري الأوروبي",
@@ -163,7 +204,7 @@
         "Serie A": "الدوري الإيطالي",
         "Bundesliga": "الدوري الألماني",
         "Ligue 1": "الدوري الفرنسي",
-        "Premier League": "الدوري المصري", // API-Football بيسميه كده برضه لمصر بس الـ ID مختلف
+        "Premier League": "الدوري المصري", 
         "Zamalek": "الزمالك",
         "Al Masry": "المصري",
         "Al Ahly": "الأهلي",
@@ -174,7 +215,20 @@
         "Chelsea": "تشيلسي",
         "Tottenham": "توتنهام",
         "Real Madrid": "ريال مدريد",
-        "Barcelona": "برشلونة"
+        "Barcelona": "برشلونة",
+        "Athletic Club": "أتلتيك بيلباو",
+        "Getafe": "خيتافي",
+        "Celta Vigo": "سيلتا فيغو",
+        "Valencia": "فالنسيا",
+        "Sevilla": "إشبيلية",
+        "Osasuna": "أوساسونا",
+        "Bologna": "بولونيا",
+        "Cremonese": "كريمونيزي",
+        "Torino": "تورينو",
+        "Roma": "روما",
+        "Inter": "إنتر ميلان",
+        "West Ham": "وست هام",
+        "Leeds": "ليدز يونايتد"
     };
 
     function t(text) {
@@ -214,16 +268,6 @@
         isArabic = !isArabic;
         localStorage.setItem('lang', isArabic ? 'ar' : 'en');
         updateUI();
-    }
-
-    // 1. الدالة دي بتحمل القنوات من ملف channels.json
-    async function loadCustomChannels() {
-        try {
-            const response = await fetch('channels.json');
-            customChannelsDB = await response.json();
-        } catch (error) {
-            console.log("لم يتم العثور على ملف channels.json، سيتم استخدام القنوات الافتراضية.");
-        }
     }
 
     async function fetchMatches() {
@@ -272,9 +316,8 @@
                 const homeName = t(m.teams.home.name);
                 const awayName = t(m.teams.away.name);
                 
-                // هنا بنبعت الاسم الإنجليزي الأصلي للدالة عشان تدور بيه في ملف الـ JSON
                 leagueHtml += `
-                    <div class="match-card" onclick="openMatchDetails('${homeName}', '${awayName}', '${m.teams.home.logo}', '${m.teams.away.logo}', '${leagueName}', '${m.teams.home.name}', '${m.teams.away.name}')">
+                    <div class="match-card" onclick="openMatchDetails('${homeName}', '${awayName}', '${m.teams.home.logo}', '${m.teams.away.logo}', '${leagueName}')">
                         <div class="team"><img src="${m.teams.home.logo}"> ${homeName}</div>
                         <div class="match-time" data-utc="${m.fixture.date}">--:--</div>
                         <div class="team away">${awayName} <img src="${m.teams.away.logo}"></div>
@@ -294,8 +337,7 @@
         });
     }
 
-    // الدالة دي دلوقتي بتاخد الاسماء الانجليزي كمان (homeEng, awayEng)
-    function openMatchDetails(t1, t2, l1, l2, league, homeEng, awayEng) {
+    function openMatchDetails(t1, t2, l1, l2, league) {
         document.getElementById('matches-list-view').style.display = 'none';
         document.getElementById('match-details-view').style.display = 'block';
         
@@ -307,15 +349,14 @@
         const lgLabel = isArabic ? "البطولة:" : "League:";
         document.getElementById('match-league-info').innerHTML = `<b>${lgLabel}</b> ${league}`;
 
-        // 2. تدوير على القنوات في قاعدة البيانات المحلية (ملف JSON)
-        // بنشوف هل في قنوات متسجلة للفريق صاحب الأرض؟ أو الضيف؟ لو مفيش بنجيب الـ default
-        const matchChannels = customChannelsDB[homeEng] || customChannelsDB[awayEng] || customChannelsDB["default"] || [];
-
         const channelsBox = document.getElementById('tab-channels');
         channelsBox.innerHTML = '';
         
-        matchChannels.forEach(ch => {
+        // استخدام القائمة الثابتة لكل المباريات
+        allMatchesChannels.forEach(ch => {
             const isLocked = ch.status === 'locked';
+            const sharingBadge = ch.sharing ? `<span class="sharing-text">Sharing Info</span>` : '';
+            
             channelsBox.innerHTML += `
                 <div class="channel-card">
                     <i class="fa-solid ${isLocked ? 'fa-lock lock-red' : 'fa-lock-open lock-green'} lock-icon"></i>
@@ -323,7 +364,10 @@
                         <div class="channel-name">${ch.name}</div>
                         <div class="channel-freq">${ch.freq}</div>
                     </div>
-                    <div class="quality-badge">${ch.quality}</div>
+                    <div style="display:flex; gap: 8px; align-items:center;">
+                        ${sharingBadge}
+                        <div class="quality-badge">${ch.quality}</div>
+                    </div>
                 </div>
             `;
         });
@@ -349,12 +393,18 @@
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }
 
-    window.onload = async () => {
-        if (localStorage.getItem('theme') === 'dark') toggleTheme();
+    window.onload = () => {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            document.body.classList.remove('dark-mode');
+            document.getElementById('theme-toggle-btn').classList.replace('fa-sun', 'fa-moon');
+        } else {
+            document.body.classList.add('dark-mode');
+            document.getElementById('theme-toggle-btn').classList.replace('fa-moon', 'fa-sun');
+        }
+
         if (localStorage.getItem('lang') === 'en') { isArabic = false; updateUI(); }
         
-        // بنحمل ملف القنوات الأول وبعدين نجيب الماتشات
-        await loadCustomChannels();
         fetchMatches();
     };
 </script>
