@@ -147,25 +147,26 @@
 
 <script>
     const API_KEY = '0c2ab936e7b9e517da7064f37da8ec10';
-    const TOP_LEAGUES = [2, 3, 39, 140, 135, 78, 61, 233, 307];
-    let cachedMatches = []; // هنخزن الماتشات هنا عشان لما نغير اللغة تترسم من غير ما نحملها تاني
-    let isArabic = true; // اللغة الافتراضية
+    const TOP_LEAGUES = [2, 3, 39, 140, 135, 78, 61, 233, 307]; // شامل الدوري المصري
+    let cachedMatches = []; 
+    let isArabic = true; 
+    
+    // متغير هيشيل الداتا بتاعة القنوات من الملف الخارجي
+    let customChannelsDB = {};
 
-    // ==========================================
-    // قاموس التعريب (الترجمة)
-    // ==========================================
+    // القاموس للتعريب
     const dictionary = {
-        // البطولات
         "UEFA Champions League": "دوري أبطال أوروبا",
         "UEFA Europa League": "الدوري الأوروبي",
-        "Premier League": "الدوري الإنجليزي الممتاز",
+        "Premier League": "الدوري الإنجليزي",
         "La Liga": "الدوري الإسباني",
         "Serie A": "الدوري الإيطالي",
         "Bundesliga": "الدوري الألماني",
         "Ligue 1": "الدوري الفرنسي",
-        "Premier League (Egypt)": "الدوري المصري",
-        
-        // الفرق (تقدر تزود أي فريق هنا)
+        "Premier League": "الدوري المصري", // API-Football بيسميه كده برضه لمصر بس الـ ID مختلف
+        "Zamalek": "الزمالك",
+        "Al Masry": "المصري",
+        "Al Ahly": "الأهلي",
         "Liverpool": "ليفربول",
         "Manchester City": "مانشستر سيتي",
         "Arsenal": "أرسنال",
@@ -173,33 +174,19 @@
         "Chelsea": "تشيلسي",
         "Tottenham": "توتنهام",
         "Real Madrid": "ريال مدريد",
-        "Barcelona": "برشلونة",
-        "Atletico Madrid": "أتلتيكو مدريد",
-        "Juventus": "يوفنتوس",
-        "AC Milan": "ميلان",
-        "Inter": "إنتر ميلان",
-        "Roma": "روما",
-        "Napoli": "نابولي",
-        "Bayern Munich": "بايرن ميونخ",
-        "Borussia Dortmund": "بروسيا دورتموند",
-        "Paris Saint Germain": "باريس سان جيرمان"
+        "Barcelona": "برشلونة"
     };
 
-    // دالة الترجمة السريعة
     function t(text) {
-        // لو إحنا مش في وضع العربي، نرجع الكلمة زي ما هي
         if (!isArabic) return text;
-        // لو الكلمة ليها ترجمة في القاموس رجعها، لو ملهاش رجعها زي ما هي بالانجليزي
         return dictionary[text] || text;
     }
 
-    // نصوص الواجهة
     const uiTexts = {
         ar: { title: "مباريات اليوم", loading: "جاري جلب المباريات...", details: "تفاصيل المباراة", channels: "قنوات البث", info: "المعلومات", noMatches: "لا توجد مباريات للدوريات الكبرى اليوم." },
         en: { title: "Today's Matches", loading: "Fetching Matches...", details: "Match Details", channels: "Channels", info: "Info", noMatches: "No matches for top leagues today." }
     };
 
-    // تحديث لغة الواجهة
     function updateUI() {
         const lang = isArabic ? 'ar' : 'en';
         document.getElementById('ui-title').innerText = uiTexts[lang].title;
@@ -212,15 +199,14 @@
             document.body.classList.remove('ltr-mode');
             document.body.setAttribute('dir', 'rtl');
             document.getElementById('back-icon').classList.replace('fa-chevron-left', 'fa-chevron-right');
-            langIcon.style.color = 'var(--text-dark)'; // لون عادي
+            langIcon.style.color = 'var(--text-dark)'; 
         } else {
             document.body.classList.add('ltr-mode');
             document.body.setAttribute('dir', 'ltr');
             document.getElementById('back-icon').classList.replace('fa-chevron-right', 'fa-chevron-left');
-            langIcon.style.color = 'var(--primary-blue)'; // ينور أزرق في الإنجليزي
+            langIcon.style.color = 'var(--primary-blue)'; 
         }
 
-        // لو الماتشات متحملة جاهزة، ارسمها باللغة الجديدة
         if(cachedMatches.length > 0) renderMatches(cachedMatches);
     }
 
@@ -230,13 +216,15 @@
         updateUI();
     }
 
-    // ==========================================
-
-    const channelsDB = [
-        { name: "beIN SPORTS 1 HD", freq: "Nilesat 7.0°W - 11013 H 27500", status: "locked", quality: "4K" },
-        { name: "Varzish Tajikistan", freq: "Yahsat 52.5°E - 11785 H 27500", status: "open", quality: "HD" },
-        { name: "DAZN 1 Germany", freq: "Astra 19.2°E - 12382 H 27500", status: "locked", quality: "HD" }
-    ];
+    // 1. الدالة دي بتحمل القنوات من ملف channels.json
+    async function loadCustomChannels() {
+        try {
+            const response = await fetch('channels.json');
+            customChannelsDB = await response.json();
+        } catch (error) {
+            console.log("لم يتم العثور على ملف channels.json، سيتم استخدام القنوات الافتراضية.");
+        }
+    }
 
     async function fetchMatches() {
         const container = document.getElementById('api-matches-container');
@@ -273,7 +261,7 @@
 
         const leagues = {};
         matches.forEach(m => {
-            const leagueName = t(m.league.name); // ترجمة اسم الدوري
+            const leagueName = t(m.league.name);
             if (!leagues[leagueName]) leagues[leagueName] = [];
             leagues[leagueName].push(m);
         });
@@ -281,11 +269,12 @@
         for (const leagueName in leagues) {
             let leagueHtml = `<div class="league-title">${leagueName}</div>`;
             leagues[leagueName].forEach(m => {
-                const homeName = t(m.teams.home.name); // ترجمة الفريق المضيف
-                const awayName = t(m.teams.away.name); // ترجمة الفريق الضيف
+                const homeName = t(m.teams.home.name);
+                const awayName = t(m.teams.away.name);
                 
+                // هنا بنبعت الاسم الإنجليزي الأصلي للدالة عشان تدور بيه في ملف الـ JSON
                 leagueHtml += `
-                    <div class="match-card" onclick="openMatchDetails('${homeName}', '${awayName}', '${m.teams.home.logo}', '${m.teams.away.logo}', '${leagueName}')">
+                    <div class="match-card" onclick="openMatchDetails('${homeName}', '${awayName}', '${m.teams.home.logo}', '${m.teams.away.logo}', '${leagueName}', '${m.teams.home.name}', '${m.teams.away.name}')">
                         <div class="team"><img src="${m.teams.home.logo}"> ${homeName}</div>
                         <div class="match-time" data-utc="${m.fixture.date}">--:--</div>
                         <div class="team away">${awayName} <img src="${m.teams.away.logo}"></div>
@@ -305,7 +294,8 @@
         });
     }
 
-    function openMatchDetails(t1, t2, l1, l2, league) {
+    // الدالة دي دلوقتي بتاخد الاسماء الانجليزي كمان (homeEng, awayEng)
+    function openMatchDetails(t1, t2, l1, l2, league, homeEng, awayEng) {
         document.getElementById('matches-list-view').style.display = 'none';
         document.getElementById('match-details-view').style.display = 'block';
         
@@ -317,9 +307,14 @@
         const lgLabel = isArabic ? "البطولة:" : "League:";
         document.getElementById('match-league-info').innerHTML = `<b>${lgLabel}</b> ${league}`;
 
+        // 2. تدوير على القنوات في قاعدة البيانات المحلية (ملف JSON)
+        // بنشوف هل في قنوات متسجلة للفريق صاحب الأرض؟ أو الضيف؟ لو مفيش بنجيب الـ default
+        const matchChannels = customChannelsDB[homeEng] || customChannelsDB[awayEng] || customChannelsDB["default"] || [];
+
         const channelsBox = document.getElementById('tab-channels');
         channelsBox.innerHTML = '';
-        channelsDB.forEach(ch => {
+        
+        matchChannels.forEach(ch => {
             const isLocked = ch.status === 'locked';
             channelsBox.innerHTML += `
                 <div class="channel-card">
@@ -354,9 +349,12 @@
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }
 
-    window.onload = () => {
+    window.onload = async () => {
         if (localStorage.getItem('theme') === 'dark') toggleTheme();
         if (localStorage.getItem('lang') === 'en') { isArabic = false; updateUI(); }
+        
+        // بنحمل ملف القنوات الأول وبعدين نجيب الماتشات
+        await loadCustomChannels();
         fetchMatches();
     };
 </script>
