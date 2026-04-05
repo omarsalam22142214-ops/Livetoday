@@ -1,0 +1,19 @@
+{
+  "Zamalek": [
+    { "name": "ON Time Sports", "freq": "Nilesat 7.0°W - 11861 V 27500", "status": "open", "quality": "HD" }
+  ],
+  "Al Masry": [
+    { "name": "ON Time Sports 2", "freq": "Nilesat 7.0°W - 11861 V 27500", "status": "open", "quality": "SD" }
+  ],
+  "Liverpool": [
+    { "name": "beIN SPORTS 1 HD", "freq": "Nilesat 7.0°W - 11013 H 27500", "status": "locked", "quality": "4K" },
+    { "name": "Diema Sport 2", "freq": "Hellas Sat 39.0°E - 12565 H 30000", "status": "locked", "quality": "HD" }
+  ],
+  "Real Madrid": [
+    { "name": "beIN SPORTS 1 HD", "freq": "Nilesat 7.0°W - 11013 H 27500", "status": "locked", "quality": "4K" }
+  ],
+  "default": [
+    { "name": "جاري إضافة القنوات", "freq": "سيتم التحديث قريباً", "status": "open", "quality": "---" }
+  ]
+}
+
