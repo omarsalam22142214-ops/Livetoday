@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق مباريات اليوم</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #f4f6f9; --white: #ffffff; --primary-blue: #3b82f6;
+            --text-dark: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0;
+            --red-lock: #ef4444; --green-lock: #10b981;
+        }
+        body.dark-mode {
+            --bg-color: #0f172a; --white: #1e293b; --text-dark: #f8fafc;
+            --text-muted: #94a3b8; --border-color: #334155;
+        }
+        body.ltr-mode { direction: ltr; font-family: sans-serif; }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        body { background-color: #333; display: flex; justify-content: center; }
+        
+        .app-container {
+            width: 100%; max-width: 414px; background-color: var(--bg-color); min-height: 100vh;
+            position: relative; overflow-x: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.5); color: var(--text-dark);
+        }
+        header {
+            background-color: var(--white); padding: 15px 20px; display: flex; justify-content: space-between;
+            align-items: center; font-weight: bold; font-size: 18px; border-bottom: 1px solid var(--border-color);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .header-icons { display: flex; gap: 15px; align-items: center; }
+        .action-icon { cursor: pointer; color: var(--text-dark); font-size: 20px; }
+        
+        #matches-list-view { padding: 15px; }
+        .league-title {
+            font-weight: bold; color: var(--text-dark); margin: 20px 0 10px; padding: 5px;
+            display: flex; align-items: center; gap: 10px; border-right: 4px solid var(--primary-blue);
+            background: var(--white); border-radius: 4px;
+        }
+        body.ltr-mode .league-title { border-right: none; border-left: 4px solid var(--primary-blue); }
+        
+        .match-card {
+            background: var(--white); border-radius: 12px; padding: 15px; display: flex;
+            justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer;
+            border: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .team { display: flex; align-items: center; gap: 10px; font-weight: 600; flex: 1; font-size: 13px; }
+        .team img { width: 25px; height: 25px; object-fit: contain; }
+        .team.away { flex-direction: row-reverse; text-align: left; }
+        body.ltr-mode .team.away { flex-direction: row-reverse; text-align: right; }
+
+        .match-time {
+            font-size: 12px; color: var(--text-muted); padding: 4px 10px; background: var(--bg-color);
+            border-radius: 20px; font-weight: bold; min-width: 80px; text-align: center; direction: ltr;
+        }
+
+        #match-details-view { display: none; background: var(--bg-color); min-height: 100vh; }
+        .hero-section {
+            background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1000&auto=format&fit=crop') center/cover;
+            color: white; padding: 40px 20px; text-align: center;
+        }
+        .teams-banner { display: flex; justify-content: space-around; align-items: center; margin-top: 15px; }
+        .hero-team { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; }
+        .hero-team img { width: 60px; height: 60px; }
+        .vs-badge { font-size: 20px; font-weight: bold; color: var(--primary-blue); }
+
+        .details-tabs { display: flex; background: var(--white); border-bottom: 1px solid var(--border-color); }
+        .details-tab { flex: 1; text-align: center; padding: 15px 0; color: var(--text-muted); font-weight: 600; cursor: pointer; }
+        .details-tab.active { color: var(--primary-blue); border-bottom: 3px solid var(--primary-blue); }
+        .tab-content { display: none; padding: 15px; }
+        .tab-content.active { display: block; }
+
+        .channel-card {
+            background: var(--white); border-radius: 10px; padding: 12px; display: flex; align-items: center; gap: 12px;
+            margin-bottom: 8px; border: 1px solid var(--border-color);
+        }
+        .lock-icon { font-size: 20px; }
+        .lock-red { color: var(--red-lock); }
+        .lock-green { color: var(--green-lock); }
+        .channel-info { flex: 1; text-align: left; direction: ltr; }
+        .channel-name { font-weight: bold; font-size: 14px; }
+        .channel-freq { font-size: 11px; color: var(--text-muted); }
+        .quality-badge { font-size: 11px; font-weight: bold; color: var(--primary-blue); }
+
+        .loading-msg { text-align: center; padding: 50px; color: var(--text-muted); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="matches-list-view">
+        <header>
+            <i class="fa-solid fa-bars action-icon"></i>
+            <span id="ui-title">مباريات اليوم</span>
+            <div class="header-icons">
+                <i id="lang-toggle-btn" class="fa-solid fa-globe action-icon" onclick="toggleLanguage()"></i>
+                <i id="theme-toggle-btn" class="fa-solid fa-moon action-icon" onclick="toggleTheme()"></i>
+                <i class="fa-solid fa-rotate-right action-icon" onclick="fetchMatches()"></i>
+            </div>
+        </header>
+
+        <div id="api-matches-container">
+            <div class="loading-msg">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 30px; margin-bottom: 15px; color: var(--primary-blue);"></i>
+                <br><span id="ui-loading">جاري جلب مباريات الدوريات الكبرى...</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="match-details-view">
+        <header>
+            <i id="back-icon" class="fa-solid fa-chevron-right action-icon" onclick="closeMatchDetails()"></i>
+            <span id="ui-details-title">تفاصيل المباراة</span>
+            <div></div>
+        </header>
+
+        <div class="hero-section">
+            <div class="teams-banner">
+                <div class="hero-team">
+                    <img id="team1-logo" src="" alt="">
+                    <span id="team1-name">---</span>
+                </div>
+                <div class="vs-badge">VS</div>
+                <div class="hero-team">
+                    <img id="team2-logo" src="" alt="">
+                    <span id="team2-name">---</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="details-tabs">
+            <div class="details-tab active" onclick="switchTab('channels')" id="ui-tab-channels">قنوات البث</div>
+            <div class="details-tab" onclick="switchTab('info')" id="ui-tab-info">المعلومات</div>
+        </div>
+
+        <div id="tab-channels" class="tab-content active"></div>
+
+        <div id="tab-info" class="tab-content">
+            <div style="background:var(--white); padding:15px; border-radius:10px; border:1px solid var(--border-color);">
+                <p id="match-league-info" style="margin-bottom:10px;"><b>البطولة:</b> ---</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_KEY = '0c2ab936e7b9e517da7064f37da8ec10';
+    const TOP_LEAGUES = [2, 3, 39, 140, 135, 78, 61, 233, 307];
+    let cachedMatches = []; // هنخزن الماتشات هنا عشان لما نغير اللغة تترسم من غير ما نحملها تاني
+    let isArabic = true; // اللغة الافتراضية
+
+    // ==========================================
+    // قاموس التعريب (الترجمة)
+    // ==========================================
+    const dictionary = {
+        // البطولات
+        "UEFA Champions League": "دوري أبطال أوروبا",
+        "UEFA Europa League": "الدوري الأوروبي",
+        "Premier League": "الدوري الإنجليزي الممتاز",
+        "La Liga": "الدوري الإسباني",
+        "Serie A": "الدوري الإيطالي",
+        "Bundesliga": "الدوري الألماني",
+        "Ligue 1": "الدوري الفرنسي",
+        "Premier League (Egypt)": "الدوري المصري",
+        
+        // الفرق (تقدر تزود أي فريق هنا)
+        "Liverpool": "ليفربول",
+        "Manchester City": "مانشستر سيتي",
+        "Arsenal": "أرسنال",
+        "Manchester United": "مانشستر يونايتد",
+        "Chelsea": "تشيلسي",
+        "Tottenham": "توتنهام",
+        "Real Madrid": "ريال مدريد",
+        "Barcelona": "برشلونة",
+        "Atletico Madrid": "أتلتيكو مدريد",
+        "Juventus": "يوفنتوس",
+        "AC Milan": "ميلان",
+        "Inter": "إنتر ميلان",
+        "Roma": "روما",
+        "Napoli": "نابولي",
+        "Bayern Munich": "بايرن ميونخ",
+        "Borussia Dortmund": "بروسيا دورتموند",
+        "Paris Saint Germain": "باريس سان جيرمان"
+    };
+
+    // دالة الترجمة السريعة
+    function t(text) {
+        // لو إحنا مش في وضع العربي، نرجع الكلمة زي ما هي
+        if (!isArabic) return text;
+        // لو الكلمة ليها ترجمة في القاموس رجعها، لو ملهاش رجعها زي ما هي بالانجليزي
+        return dictionary[text] || text;
+    }
+
+    // نصوص الواجهة
+    const uiTexts = {
+        ar: { title: "مباريات اليوم", loading: "جاري جلب المباريات...", details: "تفاصيل المباراة", channels: "قنوات البث", info: "المعلومات", noMatches: "لا توجد مباريات للدوريات الكبرى اليوم." },
+        en: { title: "Today's Matches", loading: "Fetching Matches...", details: "Match Details", channels: "Channels", info: "Info", noMatches: "No matches for top leagues today." }
+    };
+
+    // تحديث لغة الواجهة
+    function updateUI() {
+        const lang = isArabic ? 'ar' : 'en';
+        document.getElementById('ui-title').innerText = uiTexts[lang].title;
+        document.getElementById('ui-details-title').innerText = uiTexts[lang].details;
+        document.getElementById('ui-tab-channels').innerText = uiTexts[lang].channels;
+        document.getElementById('ui-tab-info').innerText = uiTexts[lang].info;
+        
+        const langIcon = document.getElementById('lang-toggle-btn');
+        if(isArabic) {
+            document.body.classList.remove('ltr-mode');
+            document.body.setAttribute('dir', 'rtl');
+            document.getElementById('back-icon').classList.replace('fa-chevron-left', 'fa-chevron-right');
+            langIcon.style.color = 'var(--text-dark)'; // لون عادي
+        } else {
+            document.body.classList.add('ltr-mode');
+            document.body.setAttribute('dir', 'ltr');
+            document.getElementById('back-icon').classList.replace('fa-chevron-right', 'fa-chevron-left');
+            langIcon.style.color = 'var(--primary-blue)'; // ينور أزرق في الإنجليزي
+        }
+
+        // لو الماتشات متحملة جاهزة، ارسمها باللغة الجديدة
+        if(cachedMatches.length > 0) renderMatches(cachedMatches);
+    }
+
+    function toggleLanguage() {
+        isArabic = !isArabic;
+        localStorage.setItem('lang', isArabic ? 'ar' : 'en');
+        updateUI();
+    }
+
+    // ==========================================
+
+    const channelsDB = [
+        { name: "beIN SPORTS 1 HD", freq: "Nilesat 7.0°W - 11013 H 27500", status: "locked", quality: "4K" },
+        { name: "Varzish Tajikistan", freq: "Yahsat 52.5°E - 11785 H 27500", status: "open", quality: "HD" },
+        { name: "DAZN 1 Germany", freq: "Astra 19.2°E - 12382 H 27500", status: "locked", quality: "HD" }
+    ];
+
+    async function fetchMatches() {
+        const container = document.getElementById('api-matches-container');
+        const lang = isArabic ? 'ar' : 'en';
+        container.innerHTML = `<div class="loading-msg"><i class="fa-solid fa-circle-notch fa-spin"></i><br>${uiTexts[lang].loading}</div>`;
+        
+        const today = new Date().toISOString().split('T')[0];
+        const url = `https://v3.football.api-sports.io/fixtures?date=${today}`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'x-apisports-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' }
+            });
+            const data = await response.json();
+
+            if (data.response) {
+                cachedMatches = data.response.filter(m => TOP_LEAGUES.includes(m.league.id));
+                
+                if (cachedMatches.length > 0) {
+                    renderMatches(cachedMatches);
+                } else {
+                    container.innerHTML = `<p style="text-align:center; padding:30px;">${uiTexts[lang].noMatches}</p>`;
+                }
+            }
+        } catch (error) {
+            container.innerHTML = '<p style="text-align:center; padding:30px; color:red;">خطأ في الاتصال بالـ API.</p>';
+        }
+    }
+
+    function renderMatches(matches) {
+        const container = document.getElementById('api-matches-container');
+        container.innerHTML = '';
+
+        const leagues = {};
+        matches.forEach(m => {
+            const leagueName = t(m.league.name); // ترجمة اسم الدوري
+            if (!leagues[leagueName]) leagues[leagueName] = [];
+            leagues[leagueName].push(m);
+        });
+
+        for (const leagueName in leagues) {
+            let leagueHtml = `<div class="league-title">${leagueName}</div>`;
+            leagues[leagueName].forEach(m => {
+                const homeName = t(m.teams.home.name); // ترجمة الفريق المضيف
+                const awayName = t(m.teams.away.name); // ترجمة الفريق الضيف
+                
+                leagueHtml += `
+                    <div class="match-card" onclick="openMatchDetails('${homeName}', '${awayName}', '${m.teams.home.logo}', '${m.teams.away.logo}', '${leagueName}')">
+                        <div class="team"><img src="${m.teams.home.logo}"> ${homeName}</div>
+                        <div class="match-time" data-utc="${m.fixture.date}">--:--</div>
+                        <div class="team away">${awayName} <img src="${m.teams.away.logo}"></div>
+                    </div>
+                `;
+            });
+            container.innerHTML += leagueHtml;
+        }
+        formatLocalTime();
+    }
+
+    function formatLocalTime() {
+        document.querySelectorAll('.match-time').forEach(el => {
+            const date = new Date(el.dataset.utc);
+            const options = isArabic ? { hour: '2-digit', minute: '2-digit', hour12: true } : { hour: '2-digit', minute: '2-digit', hour12: false };
+            el.innerText = date.toLocaleTimeString(isArabic ? 'ar-EG' : 'en-US', options);
+        });
+    }
+
+    function openMatchDetails(t1, t2, l1, l2, league) {
+        document.getElementById('matches-list-view').style.display = 'none';
+        document.getElementById('match-details-view').style.display = 'block';
+        
+        document.getElementById('team1-name').innerText = t1;
+        document.getElementById('team2-name').innerText = t2;
+        document.getElementById('team1-logo').src = l1;
+        document.getElementById('team2-logo').src = l2;
+        
+        const lgLabel = isArabic ? "البطولة:" : "League:";
+        document.getElementById('match-league-info').innerHTML = `<b>${lgLabel}</b> ${league}`;
+
+        const channelsBox = document.getElementById('tab-channels');
+        channelsBox.innerHTML = '';
+        channelsDB.forEach(ch => {
+            const isLocked = ch.status === 'locked';
+            channelsBox.innerHTML += `
+                <div class="channel-card">
+                    <i class="fa-solid ${isLocked ? 'fa-lock lock-red' : 'fa-lock-open lock-green'} lock-icon"></i>
+                    <div class="channel-info">
+                        <div class="channel-name">${ch.name}</div>
+                        <div class="channel-freq">${ch.freq}</div>
+                    </div>
+                    <div class="quality-badge">${ch.quality}</div>
+                </div>
+            `;
+        });
+    }
+
+    function closeMatchDetails() {
+        document.getElementById('match-details-view').style.display = 'none';
+        document.getElementById('matches-list-view').style.display = 'block';
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.details-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('dark-mode');
+        const icon = document.getElementById('theme-toggle-btn');
+        const isDark = document.body.classList.contains('dark-mode');
+        icon.classList.replace(isDark ? 'fa-moon' : 'fa-sun', isDark ? 'fa-sun' : 'fa-moon');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+
+    window.onload = () => {
+        if (localStorage.getItem('theme') === 'dark') toggleTheme();
+        if (localStorage.getItem('lang') === 'en') { isArabic = false; updateUI(); }
+        fetchMatches();
+    };
+</script>
+
+</body>
+</html>
